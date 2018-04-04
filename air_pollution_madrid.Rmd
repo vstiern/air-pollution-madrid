@@ -13,7 +13,7 @@ The following report will present statistical analysis of the air pollution data
 
 The report is segemented into code, analysis and inferences. Each section will be presented in an induvidual block with the code, the description and relevant inference.
 
-###Contents 
+### Contents 
 1. Libaries
 2. Functions & Variables Definitions
 3. Data Ingestion & Preparation
