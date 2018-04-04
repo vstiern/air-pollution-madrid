@@ -17,3 +17,5 @@ The report is segemented into code, analysis and inferences. Each section will b
     3. Regression Analysis
     4. Predicting NO2 levels for 2017/2018
     5. Spatial Heat Maps for Madrid 
+
+### NB. RMD File contains Shiny apps, please run file on Shiny enabled server. 
