@@ -1,0 +1,694 @@
+---
+title: "air pollution madrid analysis"
+authors: Amartya Sen, Vilhelm Stiernstedt
+date: "12/17/2017"
+output: html_document
+runtime: shiny
+---
+
+### Report Summary
+The following report will present statistical analysis of the air pollution data from the city of Madrid between 2011 and 2016. Furthermore, a time series analysis, a regression model for NO2 with forecasting for 2017 and 2018 along with a spatial heat maps of air pollution for Madrid will be presented. 
+**The analysis is meant to provide a detailed report and dashboard for policymakers and public bodies.**
+
+
+The report is segemented into code, analysis and inferences. Each section will be presented in an induvidual block with the code, the description and relevant inference.
+
+###Contents 
+1. Libaries
+2. Functions & Variables Definitions
+3. Data Ingestion & Preparation
+4. Analysis
+    1. Identify Key Pollutants and their distributions
+    2. Time Series Analysis of All key pollutants
+    3. Regression Analysis
+    4. Predicting NO2 levels for 2017/2018
+    5. Spatial Heat Maps for Madrid 
+    
+    
+### 1. Libaries
+Loading all libaries needed to ingest, prepare, analyse and plot data.
+
+```{r  echo=TRUE, message=FALSE, warning=FALSE}
+### Import libraries 
+library(data.table) 
+library(plyr)
+library(lubridate)
+library(readxl)
+library(ggplot2)
+library(dygraphs)
+library(shiny)
+library(corrplot)
+library(car)
+library(Hmisc)
+library(tseries)
+library(forecast)
+library(expsmooth)
+library(leaflet)
+```
+
+
+### 2. Functions Definitions
+Definition of all functions used in the report.
+
+```{r echo=TRUE}
+### Functions
+
+## Data Ingestion
+# 1. Function to extract year and month from file name and insert new columns
+read_csv_filename <- function(filename){
+  ret <- read.csv(filename)
+  ret$year <- paste0(20, substring(filename, 28,29)) #year
+  ret$month <- ifelse(nchar(filename)>35, substring(filename, 31,32), paste0(0, substring(filename, 31,31))) #month
+  ret$date <- ymd(paste(ret$year, ret$month, ret$day, sep = "-")) #date
+  ret$year <- NULL
+  ret$month <- NULL
+  ret$day <- NULL
+  ret
+}
+
+## Data transformation
+# 1. Function to flatten matrix
+flattenCorrMatrix <- function(cormat, pmat) {
+  ut <- upper.tri(cormat)
+  data.frame(
+    row = rownames(cormat)[row(cormat)[ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor  = (cormat)[ut],
+    p = pmat[ut]
+  )
+}
+
+# 2. Function to convert a vector into linear regression formula
+regFormula <- function(depVar,exVar) 
+{
+  t1 <- paste(depVar, '~', sep = "")
+  t2 <- paste(exVar[1:length(exVar)], collapse = "+")
+  f <- as.formula(paste(t1,t2, sep = ""))
+  return(f)
+}
+
+
+## Plots - Descriptive Analysis
+# 1. Multiplot histogram for each parameter 
+hp_func <- function(vars, binnr) {
+  dt_sel <- melt(daily_dt[, vars, with = F])
+
+    ggplot(data = melt(dt_sel), mapping = aes(x = value, colour = variable)) + 
+      geom_histogram(bins = binnr, show.legend = FALSE) + facet_wrap(~variable, scales = 'free_x') +
+      labs(y = "Frequency", x = "", 
+           caption = "Unit in parameter_info: microg/m^3 or millig/m3")
+}
+
+# 2. Boxplot Function
+bp_func <- function(parameter, wday = TRUE) {
+  
+  if(wday == TRUE) {
+    ggplot(data = daily_dt, aes(x = wday(date, label = T), y = get(parameter), fill = wday(date, label = T))) +
+      geom_boxplot(outlier.alpha = 0.5) +
+      ggtitle(paste(parameter, "by Weekday", sep = " ")) +
+      labs(x = "", y = parameter_info[param_Form == parameter, param_unit]) +
+      theme(legend.position ="none")
+  }
+  else {
+    ggplot(data = daily_dt, aes(x = month(date, label = T), y = get(parameter), fill = month(date, label = T))) +
+      geom_boxplot(outlier.alpha = 0.5) +
+      ggtitle(paste(parameter, "by Month", sep = " ")) +
+      labs(x = "", y = parameter_info[param_Form == parameter, param_unit]) +
+      theme(legend.position="none")
+  }
+}
+
+# 3. Scatterplot function
+sp_func <- function(var1, var2, line) {
+  ggplot(daily_dt, aes(x = get(var1), y = get(var2))) +
+    geom_smooth(method = paste(line), se=F) +
+    geom_jitter(width = .5, size = 1) + 
+    labs(x = paste(var1, parameter_info[param_Form == var1, param_unit]),
+         y = paste(var2, parameter_info[param_Form == var2, param_unit]))
+}
+
+# 4. Function for time series graph
+tsp_func <- function(var1, m = T, s = T) {
+  mean <- as.numeric(lapply(daily_dt[, var1, with = F], mean, na.rm = T))
+  std <- mean - as.numeric(lapply(daily_dt[, var1, with = F], sd, na.rm = T))
+  
+  dygraph(daily_dt[, c("date", var1), with = F], main = paste("Avg daily value of", var1, sep = ": ")) %>%
+    dyAxis("y", label = paste(parameter_info[param_Form == var1, param_unit])) %>%
+    dyLimit(ifelse(m == T, mean, NA), color = "darkgreen", label = "Mean", labelLoc = "left") %>% 
+    dyShading(from = mean - std, to = mean + std, color = ifelse(s == T, "lightgrey", "white"), axis = "y") %>%  
+    dyRangeSelector()
+}
+```
+
+
+
+### 3. Data Ingestion & Preparation
+Air pollution data consists of monthly CSV files, a total of 72 files for period 1st of Janauary 2011 to 31st of December 2016. Each file holds hourly data for each air pollutant and monitoring station, with some missing values. Additional files include weather for Madrid and description of parameters for each air pollutant. We prepare a master dataset comprising of average daily data from 01/01/2011 to 31/12/2016. We assume missing values to be zero. We create subset for this data for specefic analysis as and when required. 
+
+##### Files Ingested:
+1. Air Pollution - Hourly readings per pollutant and station.
+2. Weather - Weahter Data for Madrid.
+3. Parameters - Name, ID, Chemical formula for each air pollutant.
+4. Station - Location of each monitor station. 
+
+```{r echo=TRUE}
+
+### 3. Data Ingestion
+# Put air pollution filenames into list.
+files <- list.files(path = "workgroup_data", pattern = ".csv", full.names = TRUE)
+
+# Ingest air pollution data
+dt <- data.table(ldply(files, read_csv_filename))
+
+# Ingest weather data
+wth_data <- data.table(read_xlsx("weather.xlsx"))
+wth_data$date <- ymd(wth_data$date)
+
+# Merge weather and air pollution data
+dt <- merge(dt, wth_data, by = "date", all.x = TRUE)
+
+# Ingest parameter information
+parameter_info <- data.table(read.csv("parameters.csv"))
+
+# Add parameter notation to air pollution weather data -> final data table
+dt <- merge(dt, parameter_info[ , c("param_ID", "param_Form")],
+            by.x = "parameter", by.y = "param_ID", all.x = TRUE)
+dt$parameter <- NULL
+
+# Ingest station information
+station_info <- data.table(read.csv("stations.csv"))
+
+### 3. Data Transformation
+# Assume NAs are missing data and remove all associated rows.
+dt <- dt[complete.cases(dt),]
+
+# Cast each parameter to induvidual column
+wide_dt <- dcast(dt, date + hour + station + temp_avg + temp_max + temp_min + precipitation +
+                 humidity + wind_avg_speed ~ param_Form, value.var = 'value')
+
+# Daily Averages per parameter (mean of all hours per date and station)
+daily_station_dt <- wide_dt[, lapply(.SD, mean, na.rm = TRUE), .SDcols = names(wide_dt[, 4:21]),
+                            by = c('date', 'hour', 'station')]
+
+# Merge with station_info to get lat and long
+daily_station_dt <- merge(daily_station_dt, station_info, by.x = "station", by.y = "station_ID", all.x = TRUE)
+
+# Daily Averages per parameter (mean of all hours and stations)
+daily_dt <- wide_dt[, lapply(.SD, mean, na.rm = TRUE), .SDcols = names(wide_dt[, 4:21]), by = date]
+
+# variables for regression
+reg_dt <- daily_dt[, 2:19]
+```
+
+
+### 4. Analysis
+Analysis consist of five parts:
+
+1. Identify Key Pollutants and their distributions
+2. Time Series Analysis of All key pollutants
+3. Regression Analysis
+4. Predicting NO2 levels for 2017/2018
+5. Spatial Heat Map for Madrid 
+
+
+#### 4.1 Identify Key Pollutants and their distributions
+First we look at induvidual pollutants and understand distrubutions to get a sense of the overall picture of poullutants.
+
+```{r echo=TRUE, message=FALSE}
+# Summary of parameters
+dt[, as.list(summary(value)), by = param_Form]
+
+## Descriptive Analysis
+# 1. Shiny app histogram
+shinyApp(
+  options=list(width="100%", height = 700),
+  ui <- shinyUI(fluidPage(
+      sidebarLayout(
+        sidebarPanel(
+          fluidRow(
+            sliderInput("binnr", label = "Select Nr of Bins:",  min = 5, max = 30, step = 5, value = 10),
+            checkboxGroupInput("vars", label = "Select Variables:", choices = c(colnames(reg_dt)),
+                              selected = c(colnames(reg_dt[,1:6])))
+            )
+        ),
+        mainPanel(
+          titlePanel("Histogram"),
+            plotOutput("histoplot", width = "100%", height = 500)
+        )
+      )
+    )
+  ),
+  server <- shinyServer(function(input,output) {
+    output$histoplot = renderPlot({
+      hp_func(input$vars, input$binnr)
+    })
+  })
+)
+```
+
+##### Plot Summary
+Distributions for all pollutants readings and daily frequency. Most pollutants are positively skewed.
+
+###### Key Points
+1. Ozone (O3) have a high frequency of low to high readings and thus fluctluates more than other pollutants.
+2. Nitric oxide (N0) levels are close to zero many days.
+3. It would be intresting to note when the higher pollution levels are experienced. 
+
+Hence we look at the distrubution by days of the week and by month of the year to identify trends and pattern.
+
+
+```{r trial, echo=TRUE}
+
+# 2. Shiny app for boxplot
+shinyApp(
+  options=list(width="100%", height = 700),
+  ui <- shinyUI(fluidPage(
+    titlePanel("Box Plot"),
+    fluidRow(
+      column(width = 3,
+             selectInput("parameter", label = "Select Variables:",
+                         choices = colnames(daily_dt[, 2:19]), selected = "SO2")
+      ),
+      column(width = 3,
+             radioButtons("period", label = "Select Weekday or Month:",
+                          choices = c("Weekday" = T, "Month" = F), selected = T)
+      )
+    ),
+    plotOutput("boxplot", width = "100%", height = 500)
+  )
+  ),
+  server <- shinyServer(function(input,output) {
+    output$boxplot = renderPlot({
+      bp_func(input$parameter, input$period)
+    })
+  })
+)
+```
+
+##### Plot Summary
+Box plot that shows distrubution by day of week for selected pollutant, here Nitrogen dioxide (NO2).
+
+###### Key Points:
+1. NO2 means similarly high for weekdays and lower for weekends.
+2. All days carry outliers, Sunday's have relatively lower dispersion.
+3. **For most of the key pollutants we see that the levels are higher on weekdays compared to weekends, implaying traffic and industries might be the key external determinent of pollution in Madrid.**
+4. **We also see a trend that pollution levels are generally higher during winter months (Nov-Feb).**
+
+```{r trial2, echo=TRUE, message=FALSE, warning=FALSE}
+
+# 3. Shiny app for scatterplot
+shinyApp(
+  options=list(width = "100%", height = 700),
+  ui <- shinyUI(fluidPage(
+    titlePanel("Scatterplot"),
+    fluidRow(
+      column(width = 3,
+             selectInput("var1", label = "Select X-Axis:",
+                         choices = as.factor(colnames(wide_dt[,4:21])), selected = "SO2")
+      ),
+      column(width = 3,
+             selectInput("var2", label = "Select Y-Axis:",
+                         choices = as.factor(colnames(wide_dt[,4:21])), selected = "NO2")
+      ),
+      column(width = 5,
+             radioButtons("line", label = "", inline = TRUE,
+                          choices = c("None" = "", "Smooth Line" = "loess", "LM" = "lm"), selected = "")
+      )
+    ),
+    plotOutput("scatterplot", width = "100%", height = 500)
+  )
+  ),
+  server <- shinyServer(function(input,output) {
+    output$scatterplot = renderPlot({
+      sp_func(input$var1, input$var2, input$line)
+    })
+  })
+)
+```
+
+##### Plot Summary
+Scatter plot that shows relationship between any two variables from the list of pollutants and metrological data.
+
+###### Key Points:
+1. Most of the pollutants are positively correlated to eachother in a homoscedastic linear fashion. Implying that the source of the pollutants might be off similar nature across Madrid such as traffic and industry. It would be good to later look at the distrubution of the level of pollutions across locations in Madrid.
+
+
+#### 4.2. Time Series Analysis of All key pollutants
+
+```{r echo=TRUE, message=FALSE}
+
+# Analysis 4.2: Time Series Analysis of All key pollutants
+# 4. Shiny app for time series graph:
+shinyApp(
+  options=list(width = "100%", height = 700),
+  ui <- shinyUI(fluidPage(
+    titlePanel("Time Series of Varible"),
+    fluidRow(
+      column(width = 3,
+             selectInput("var1", label = "Select Variable:",
+                         choices = colnames(daily_dt[,2:19]), selected = "SO2")
+      ),
+      column(width = 1,
+             checkboxInput("mean", label = "Mean", value = F)),
+      column(width = 3,
+             checkboxInput("std", label = "Mean +/- Std", value = F)
+      )
+    ),
+    dygraphOutput("timeseriesplot", width = "100%", height = 500)
+  )
+  ),
+  server <- shinyServer(function(input,output) {
+    output$timeseriesplot = renderDygraph({
+      tsp_func(input$var1, input$mean, input$std)
+    })
+  })
+)
+```
+
+##### Plot Summary
+Time series graph for selected pollutants from 01/01/2011 to 31/12/2016.
+
+###### Key Points:  
+1. The levels are on an average higher in the winter months.
+2. The variance in the daily levels are similar for the key pollutants (SO2, NO2, CO).
+3. The average level of pollution have gone up gradually across years 2011 to 2016. 
+
+#### 4.3 Regression Analysis
+NO2 is considered one of the most dangerous pollutants and WHO provideds strict guidelines to maintain its level below a certain threshold. So our objective is to understand how NO2 is related to the other pollutants and weather variables. We can explain the levels of NO2 better through correlation and regression model. Subsequently we can choose a good regression model to predict levels of NO2 for the coming years and provide a high level picture of days when levels are above the threshold as per the WHO guidelines. 
+
+```{r echo=TRUE, message=FALSE}
+
+# Analysis 4.3: Regression Analysis 
+
+### 4.3a. Correlation between Pollutants
+# 5. Shiny App for Correlogram
+shinyApp(
+  options=list(width="100%", height = 700),
+  ui <- shinyUI(
+          fluidPage(
+            sidebarLayout(
+              sidebarPanel(
+                radioButtons("option", label = "Select Addition:",
+                            choices = c("None", "Significance Level" = "sig",
+                                        "Correlation Coefficients" = "coeff"), selected = "None"),
+                checkboxGroupInput("vars", label = "Select Variables:", choices = c(colnames(reg_dt)),
+                                   selected = c(colnames(reg_dt[,1:6])))
+              ),
+              mainPanel(
+                titlePanel("Correlogram"),
+                  plotOutput("correplot", width = "100%", height = 500)
+              )
+            )
+          )
+        ),
+  server <- shinyServer(function(input,output) {
+    output$correplot = renderPlot({
+      dt_sel <- reg_dt[, input$vars, with = F]
+      dt_cor_mat <- rcorr(as.matrix(dt_sel))
+      #With signifigance test
+      if(input$option == "sig") {
+        corrplot(cor(dt_sel), p.mat = dt_cor_mat$P, method = "color", type = "lower", tl.col = "black",
+                 tl.srt = 45, order = "alphabet", sig.level = c(.001, .01, .05), pch.cex = 10/ncol(dt_sel),
+                 insig = "label_sig", pch.col = "grey")
+      } 
+      #With correlations coeffecients 
+      if(input$option == "coeff") {
+        corrplot(cor(dt_sel), method = "color", type = "lower", tl.col = "black", tl.srt = 45, order = "alphabet",
+                 addCoef.col = "grey", number.cex = 7/ncol(dt_sel))  
+      }
+      #With no additions
+      if(input$option == "None")
+        corrplot(cor(dt_sel), method = "color", type = "lower", tl.col = "black", tl.srt = 45, order = "alphabet")
+    })
+  })
+)
+```
+
+##### Plot Summary
+Correlation matrix that shows correlation score for all parameters
+
+###### Pollutant Key Points:  
+1. Strong positive correlations between many variables.
+2. PM10 and NHMC are exceptions, low correlations.
+3. Strongest correlation is between CO and NO, 0.97. At the same time NO is strongly correlated to NO2 (which is scientifically obvious). We therefore can consider only CO as a explantory variable for NO2.
+4. Strong negative correlations for O3 in relation to CO, NO, NO2 and BEN.
+
+###### All Parameter Key Points:
+1. SO2, CO, NO and NO2 negativly correlated with temperture. 
+2. O3 strongly negatively correlated with humidity.
+3. O3 positively correlated with temperatures.
+4. O3 seems to be a reverse causal in nature to the other pollutants.
+We can run 3 different logically correct regression models, one with just the pollutants, one with weather variables and one with combination of both to understand the modelling of NO2.
+
+###### NO2 Selected Correlations:
+1. S02: 0.67
+2. CO: 0.89
+3. PM2.5: 0.64
+4. EBE: 0.65
+5. Temp_Avg: -0.38
+6. Wind_Avg_Speed: -0.60 
+
+#### 4.3 Regression Analysis: Modelling
+
+```{r echo=TRUE, message=FALSE}
+
+### 4.3c. Choose explantory variables for NO2 Regression
+# Explantory variables for NO2 Regression
+NO2_ExVars <- c('SO2','CO','PM2.5','EBE', 'temp_avg', 'wind_avg_speed')
+
+### 4.3d. Regression Analysis
+# 2011-2015 chosen as training data, 2016 as testing data
+trainSet <- daily_dt[year(date) < 2016, ]
+testSet <- daily_dt[year(date) == 2016, ]
+
+# Regression Model
+NO2Reg <- lm(regFormula('NO2', NO2_ExVars), trainSet)
+summary(NO2Reg)
+```
+
+```{r echo=TRUE, message=FALSE}
+# Initial Diagnostic Plot
+par(mfrow=c(2, 2))
+par(mar = rep(2, 4))
+plot(NO2Reg)
+```
+
+##### Table Summary
+Output shows a Summary of three different regression models. 
+Chosen model is the last of the three as it incorperates some weather variables and also gets the  highest R^2 score with statisticaly significant vairables.  
+
+###### Key Points:
+1. All coeffcients are statistically significant with coinfindence level of more than 99.99%.
+2. Adjusted R^2: 0.8744.
+Instead of going towards mathematical residual analysis , we take a slightly less scientific but more practical residual analysis approach where we look
+at the predicted values vs the actual for different sets of data and understand for which seasons(months, days etc) the model provides a good fit. This is because the level of NO2 has a high seasonal trend and any regression model will show good results for some of the months only. Moreover a high R square implies that the variance can be explained for almost 87% of the cases which is good.
+
+```{r echo=TRUE, message=FALSE}
+# TrainSet: Actual vs Fitted values
+fitted_val <- NO2Reg$fitted
+actual_data <- trainSet[, c("date", "NO2")]
+a_vs_f <- cbind(actual_data, fitted_val)
+
+# plot  
+dygraph(a_vs_f, main = "Actual vs Fitted: Training Set") %>% 
+  dySeries( "NO2", label = "Actual") %>%
+  dySeries( "fitted_val" , label = "Fitted") %>% 
+  dyAxis("y", label = paste(parameter_info[param_Form == "NO2", param_unit])) %>%
+  dyRangeSelector() 
+```
+
+##### Plot Summary
+Plot shows actual vs fitted values for NO2 using chosen regression model period 01/01/2011 to 31/01/2015
+
+###### Key Points:  
+1. Fitted values follows actual trend very well, as expected given good R^2 score.
+2. Model misses some extremes values, particular during summer months. The model is more efficient for winter months, which fits our practical goal since winter months have higher levels of pollution.
+We  can also test the model for 2016 data and the go ahead to prediction.
+
+```{r echo=TRUE, message=FALSE}
+# TestSet: Actual vs Predicted values
+predicted_val <- predict(NO2Reg, newdata = testSet[, NO2_ExVars, with = F])
+act_data <- testSet[, c("date", "NO2")]
+a_vs_p <- cbind(act_data, predicted_val)
+
+# plot
+dygraph(a_vs_p, main = "Actual vs Predicted: Testing Set") %>% 
+  dySeries( "NO2", label = "Actual") %>%
+  dySeries( "predicted_val" , label = "Predicted") %>% 
+  dyAxis("y", label = paste(parameter_info[param_Form == "NO2", param_unit])) %>%
+  dyRangeSelector() 
+```
+
+##### Plot Summary
+Plot shows actual vs fitted values for NO2 using chosen regression model period 01/01/2016 to 31/01/2016
+
+###### Key Points:  
+1. Model misses some extremes values, particular during summer months and during October.
+
+We can now go ahead and predict the future values of NO2. For which we need the values of the explantory/predictor variables. We use time series forecasting using Holt Winters process to find forecasts of all the paramaters (pollutants and weather elements) considering the weekly seasonalities.
+
+
+#### 4.4 Predicting NO2 levels for 2017/2018
+
+```{r echo=TRUE}
+
+# Analysis 4.4: Predicting NO2 levels for the future year
+# Time series with daily seasonality for NO2 regressors
+ts_ExVars <- msts(daily_dt[, NO2_ExVars, with=F], start=2011, seasonal.periods = c(7, 365.25))
+
+# Define empty lists to hold forecasted values 
+tmp_fc_ExVars <- list()
+fc_ExVars <- list()
+
+# Create loop that will produce forecast per regressor using HoltWinters method
+# and add to above lists
+for (i in 1:ncol(ts_ExVars)){
+  tmp_fc_ExVars[[i]] <- forecast(HoltWinters(ts_ExVars[,i]), h = 730)  
+  fc_ExVars[[i]] <- as.numeric(tmp_fc_ExVars[[i]]$mean) 
+}
+
+# merge date range with forecasted values
+fcts_df <- cbind(seq(as.Date("2017-01-01"), as.Date("2018-12-31"), by="days"),
+                 data.frame(do.call(cbind, fc_ExVars)))
+
+# define variable names
+names(fcts_df) <- c('date', NO2_ExVars)
+
+# For parameters, convert incorrect negetive values from forecast to
+# positive by absolute approximation
+fcts_df[, c(2:5)] <- abs(fcts_df[, c(2:5)])
+
+# Create dt with forecast range and NO2 predictions using LM with forecasted regressors
+N02_predictions <- data.table('date' = fcts_df[,'date'],
+                              'NO2_Fcst' = predict(NO2Reg, newdata = fcts_df[, c(NO2_ExVars)]))
+
+# 6. Shiny App for NO2 Forecast with threshold
+shinyApp(
+  options=list(width = "100%", height = 700),
+  ui <- shinyUI(fluidPage(
+    titlePanel("NO2 Forecasts for 2017 & 2018"),
+    fluidRow(
+      column(width = 3,
+             helpText("Select NO2 Threshold"),
+             selectInput("threshold", label = "Threshold Level",
+                         choices = seq(50, 100, by= 5)), selected = 70)
+    ),
+    dygraphOutput("thresholdplot", width = "100%", height = 500)
+  )
+  ),
+  server <- shinyServer(function(input,output) {
+    output$thresholdplot = renderDygraph({
+
+      NO2_threshold <- as.numeric(input$threshold)
+      flaged_dates <- N02_predictions[(NO2_Fcst - NO2_threshold) > 0, date]
+      
+      dygraph(N02_predictions, main = "NO2 Forecast") %>% 
+        dySeries( "NO2_Fcst", label = "NO2 Level") %>%
+        dyAxis("y", label = paste(parameter_info[param_Form == "NO2", param_unit])) %>%
+        dyEvent(flaged_dates, color = 'red') %>%
+        dyRangeSelector() %>%
+        dyOptions(colors = 'cornflowerblue')
+    })
+  })
+)
+```
+
+##### Plot Summary
+Plot shows predicted values for NO2 for period 01/01/2017 to 31/12/2018 with days when NO2 overceeds health warning threshold. For analysis purposes we have kept the selection of the threshold as a choice. Forecast is based on chosen regression model and forecasted values for explanatory variables. 
+
+###### Key Points:  
+1. NO2 values follows a similar overall trend as noticed between 2011 and 2016, spikes in winter and lows in summer.  
+2. NO2 flatulates highly on a daily basis.  
+3. As winter carries the highest levels of NO2, many days in winter are predicited to overceed health threshold for both 2017 and 2018.
+4. March 2017 experience as few days of warnings.
+
+**Next we look at the geographical distribution of the levels of pollution**
+It would be interesting to see the heat maps of different pollutants over the day (by hour) or over the year(by month). We can also do this analysis for different time periods.
+
+#### 4.5 Spatial Heat Maps for Madrid - Per Hour 
+
+```{r trail5 ,echo=TRUE, message=FALSE, warning=FALSE}
+
+# Analysis 5 : Spatial Heat Map for Madrid
+# 7. Shiny App for Spatial Heat Maps for Madrid
+shinyApp(
+  options=list(width="100%", height=700),
+  ui <- shinyUI(fluidPage(
+    titlePanel("Parameter Averages Madrid Heat Map"),
+    sidebarLayout(
+      sidebarPanel(
+        selectInput("parameter", label = "Select Parameter",
+                    choices = names(daily_dt)[2:19], selected = "SO2") 
+        ,
+        selectInput("hour", label = "Select Hour",
+                    choices = c(seq(1,24)), selected = 12)
+        ,
+        selectInput("month", label = "Select Month",
+                    choices = c(seq(1,12)), selected = 6)
+        ,
+        selectInput("start", label = "Select Start Year",
+                    choices = c(seq(2011,2016)), selected = 2011)
+        ,
+        selectInput("end", label = "Select End Year",
+                    choices = c(seq(2011,2016)), selected = 2016)
+      ),
+      mainPanel(
+        leafletOutput("mapplot", width = "100%", height = 600)
+      )    
+    )
+  )
+  ),
+  server <- shinyServer(function(input,output) {
+    output$mapplot = renderLeaflet({
+
+      # input parameters
+      setHour <- input$hour
+      setMonth <- input$month
+      startYear <- input$start
+      endYear <- input$end
+      parameter <- input$parameter
+      
+      # subset df as per input parameters
+      tmp_dt <- daily_station_dt[(year(date) >= startYear) & (year(date) <= endYear) 
+                                 & month(date) == setMonth & hour == setHour,
+                                 sapply(.SD, mean, na.rm = TRUE), .SDcols = parameter,
+                                 by = c('station', 'station_loc', 'Lng', 'Lat')]
+      
+      # Create a color palette with defined bins
+      mypalette = colorBin(palette = "YlOrBr", domain = tmp_dt$V1, na.color="black", bins = 5)
+      
+      # Define text
+      mytext = paste("Stations: ", tmp_dt$station_loc,
+                     "<br/>", "Magnitude: ", tmp_dt$V1,
+                     sep = "") %>% lapply(htmltools::HTML)
+      # plot
+      leaflet(data = tmp_dt) %>% addTiles() %>%
+        fitBounds(min(tmp_dt$Lng), min(tmp_dt$Lat),
+                  max(daily_station_dt$Lng), max(daily_station_dt$Lat)) %>%
+        addProviderTiles("Esri.WorldImagery") %>%
+        addProviderTiles(providers$Esri.WorldGrayCanvas) %>% 
+        addProviderTiles(providers$Stamen.TonerLabels) %>%
+        addProviderTiles(providers$Stamen.TonerLines, options = providerTileOptions(opacity = 0.35))  %>%
+        addCircleMarkers(~Lng, ~Lat, fillColor = ~mypalette(V1), fillOpacity = 0.7, color = "white",
+                         radius = 8, stroke=FALSE, label = mytext,
+                         labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"),
+                                                     textsize = "13px", direction = "auto")) %>%
+        addLegend(pal = mypalette, values= ~V1, opacity=0.9,
+                  title = parameter_info[param_Form == parameter, param_unit],
+                  position = "bottomright" )
+    })
+  })
+)  
+```
+
+##### Plot Summary
+Map shows pollution score (aggreageted values of all polluants) per induviudal monitoring station and selected hour. Here the selected hour is 11:00. Colour and size indicates relative pollution score.
+
+###### Key Points:  
+1. Green areas, eg. Casa de Campo, have genereally lower pollution scores.
+2. Central Madrid, around Sol, has the highest pollution score.
+
+** This data can be considered for understanding and implementing traffic, industry and utility policies in Madrid keeping in mind the pollution distribution. Additionally going forward this data can be used to setup more sensors and install filters etc in various places to control and reduce the pollution levels.**
+
+#### CONCLUSION####
+The analysis presented provides to basic needs for pollution management. Firstly it provides a future view for NO2 and helps public services and policy makers decide on how to tackle the increasing pollution levels and on which periods or dates create potential alerts or bans on traffic and industry operations to maintain the NO2 levels. Secondly it also provides a eagle eye view to understanding which areas needs better deployment of pollution control mechanisms. The basic anlaysis and trends can also be used for developing basic guidelines for pollution control policies and rules. Going forward the existing data can be merged with additional data from traffic, industry reports etc to create a more in-depth analysis of how to tackle the pollution at source and the provide better management and curing methods for the coming future.
