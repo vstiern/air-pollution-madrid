@@ -690,5 +690,5 @@ Map shows pollution score (aggreageted values of all polluants) per induviudal m
 
 ** This data can be considered for understanding and implementing traffic, industry and utility policies in Madrid keeping in mind the pollution distribution. Additionally going forward this data can be used to setup more sensors and install filters etc in various places to control and reduce the pollution levels.**
 
-#### CONCLUSION####
+#### CONCLUSION
 The analysis presented provides to basic needs for pollution management. Firstly it provides a future view for NO2 and helps public services and policy makers decide on how to tackle the increasing pollution levels and on which periods or dates create potential alerts or bans on traffic and industry operations to maintain the NO2 levels. Secondly it also provides a eagle eye view to understanding which areas needs better deployment of pollution control mechanisms. The basic anlaysis and trends can also be used for developing basic guidelines for pollution control policies and rules. Going forward the existing data can be merged with additional data from traffic, industry reports etc to create a more in-depth analysis of how to tackle the pollution at source and the provide better management and curing methods for the coming future.
