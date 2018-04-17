@@ -1,0 +1,10 @@
+name: test_7
+title:
+username:
+account: vstiern
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 324472
+bundleId: 1323042
+url: https://vstiern.shinyapps.io/test_7/
+when: 1523968137.09697

@@ -1,0 +1,13 @@
+name: shiny_app_7
+title: shiny_app_7
+username:
+account: vstiern
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 324490
+bundleId: 1323104
+url: https://vstiern.shinyapps.io/shiny_app_7/
+when: 1523969473.09087
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: data/daily_station_dt.RDS|data/N02_predictions.RDS|data/parameter_info.RDS|data/wide_dt.RDS

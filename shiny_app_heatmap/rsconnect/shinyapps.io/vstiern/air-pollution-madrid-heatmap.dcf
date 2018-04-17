@@ -1,0 +1,13 @@
+name: air-pollution-madrid-heatmap
+title: air-pollution-madrid-heatmap
+username:
+account: vstiern
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 324542
+bundleId: 1323302
+url: https://vstiern.shinyapps.io/air-pollution-madrid-heatmap/
+when: 1523974855.82152
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: data/N02_predictions.RDS|data/wide_dt.RDS

@@ -1,0 +1,12 @@
+name: shiny-app-4
+title: shiny-app-4
+username:
+account: vstiern
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 324446
+bundleId: 1322938
+url: https://vstiern.shinyapps.io/shiny-app-4/
+when: 1523963549.57126
+asMultiple: FALSE
+asStatic: FALSE

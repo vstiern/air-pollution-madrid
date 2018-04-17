@@ -1,0 +1,13 @@
+name: airpollution-madrid-analysis
+title: airpollution-madrid-analysis
+username:
+account: vstiern
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 324528
+bundleId: 1323274
+url: https://vstiern.shinyapps.io/airpollution-madrid-analysis/
+when: 1523973812.9964
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: data/daily_station_dt.RDS|data/wide_dt.RDS

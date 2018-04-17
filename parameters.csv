@@ -1,0 +1,18 @@
+param_ID,param_Name,param_Form,param_unit
+01,Dioxido de Azufre,SO2,microg/m^3
+06,Monoxido de Carbono,CO,millig/m3
+07,Monoxido de Nitrogeno,NO,microg/m^3
+08,Dioxido de Nitrogeno,NO2,microg/m^3
+09,Particulas < 2.5 micron,PM2.5,microg/m^3
+10,Particulas < 10 micron,PM10,microg/m^3
+12,Oxidos de Nitrogeno,NOx,microg/m^3
+14,Ozono,O3,microg/m^3
+20,Tolueno,TOL,microg/m^3
+30,Benceno,BEN,microg/m^3
+35,Etilbenceno,EBE,microg/m^3
+37,Metaxileno,MXY,microg/m^3
+38,Paraxileno,PXY,microg/m^3
+39,Ortoxileno,OXY,microg/m^3
+42,Hidrocarburos totales (hexano),TCH,millig/m3
+43,Metano,CH4,millig/m3
+44,Hidrocarburos no metanicos (hexano),NMHC,millig/m3

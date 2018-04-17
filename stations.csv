@@ -1,0 +1,25 @@
+station_ID,station_Name,station_loc,Lng,Lat,Alt,Type
+28079004,Pza. de España,Plaza de España,-3.7122472222222225,40.423852777777775,635,Urbana de trafico
+28079008,Escuelas Aguirre,Entre C/ Alcalá y C/ O’ Donell,-3.6823194444444445,40.42156388888888,670,Urbana de trafico
+28079011,Avda. Ramón y Cajal,Avda. Ramón y Cajal  esq. C/ Príncipe de Vergara,-3.6773555555555553,40.451475,708,Urbana de trafico
+28079016,Arturo Soria,C/ Arturo Soria  esq. C/  Vizconde de los Asilos,-3.6392333333333333,40.44004722222222,693,Urbana de fondo
+28079017,Villaverde,C/. Juan Peñalver,-3.713322222222222,40.34713888888889,604,Urbana de fondo
+28079018,Farolillo,Calle Farolillo - C/Ervigio,-3.7318527777777777,40.394780555555556,630,Urbana de fondo
+28079024,Casa de Campo,Casa de Campo  (Terminal del Teleférico),-3.7473472222222224,40.419355555555555,642,Suburbana
+28079027,Barajas Pueblo,"C/. Júpiter, 21 (Barajas)",-3.580030555555555,40.47692777777778,621,Urbana de fondo
+28079035,Pza. del Carmen,Plaza del Carmen esq. Tres Cruces.,-3.7031722222222223,40.41920833333333,659,Urbana de fondo
+28079036,Moratalaz,Avd. Moratalaz  esq. Camino de los Vinateros,-3.6453055555555554,40.40794722222222,685,Urbana de trafico
+28079038,Cuatro Caminos,Avda. Pablo Iglesias esq. C/ Marqués de Lema,-3.707127777777778,40.445544444444444,698,Urbana de trafico
+28079039,Barrio del Pilar,Avd. Betanzos esq. C/  Monforte de Lemos,-3.7115416666666667,40.47822777777778,674,Urbana de trafico
+28079040,Vallecas,C/ Arroyo del Olivar  esq. C/  Río Grande.,-3.6515222222222223,40.388152777777776,677,Urbana de fondo
+28079047,Mendez Alvaro,C/ Juan de Mariana / Pza. Amanecer Mendez Alvaro,-3.6868250000000002,40.398113888888886,599,Urbana de fondo
+28079048,Castellana,C/ Jose Gutierrez Abascal,-3.690366666666667,40.43989722222222,676,Urbana de trafico
+28079049,Parque del Retiro,Paseo Venezuela- Casa de Vacas,-3.682583333333333,40.41444444444444,662,Urbana de fondo
+28079050,Plaza Castilla,Plaza Castilla (Canal),-3.6887694444444445,40.46557222222223,728,Urbana de trafico
+28079054,Ensanche de Vallecas,Avda La Gavia / Avda. Las Suertes,-3.6121166666666666,40.372933333333336,627,Urbana de fondo
+28079055,Urb. Embajada,C/ Riaño (Barajas),-3.580747222222222,40.46253055555556,618,Urbana de fondo
+28079056,Pza. Fernández Ladreda,Pza. Fernández Ladreda - Avda. Oporto,-3.718727777777778,40.38496388888889,604,Urbana de trafico
+28079057,Sanchinarro,C/ Princesa de Eboli esq C/ Maria Tudor,-3.660502777777778,40.49420833333333,700,Urbana de fondo
+28079058,El Pardo,Avda. La Guardia,-3.774611111111111,40.51805833333333,615,Suburbana
+28079059,Juan Carlos I,Parque Juan Carlos I (frente oficinas mantenimiento),-3.6090722222222222,40.465250000000005,660,Suburbana
+28079060,Tres Olivos,Plaza Tres Olivos,-3.6897611111111113,40.50058888888889,715,Urbana de fondo

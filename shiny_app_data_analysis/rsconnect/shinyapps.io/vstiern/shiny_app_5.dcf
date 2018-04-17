@@ -1,0 +1,12 @@
+name: shiny_app_5
+title: shiny_app_5
+username:
+account: vstiern
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 324465
+bundleId: 1323009
+url: https://vstiern.shinyapps.io/shiny_app_5/
+when: 1523967109.51562
+asMultiple: FALSE
+asStatic: FALSE
