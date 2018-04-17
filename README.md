@@ -25,10 +25,3 @@ ShinyApps used for all graphic analysis. Please download notebook and run on shi
     3. Regression Analysis
     4. Predicting NO2 levels for 2017/2018
     5. Spatial Heat Maps for Madrid 
-
-### NB.
-ShinyApps used for all graphic analysis. Please download notebook and run on shiny enabled platform i.e RStudio. Otherwise, please use links below to find relevant analysis:
-
-All Data Exploration + NO2 Forecast: https://vstiern.shinyapps.io/air-pollution-madrid-analysis/
-Heatmap: https://vstiern.shinyapps.io/air-pollution-madrid-heatmap/
-
